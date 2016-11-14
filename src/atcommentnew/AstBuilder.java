@@ -176,7 +176,7 @@ public  class AstBuilder {
 		IPath withoutExtension=unit.getPath().removeFileExtension();
 		
 		boolean success=false;
-		String path="D://Eclipse Projects/runtime-EclipseApplication/collections/NullProperties";
+		String path="/home/2015/iratol/runtime-EclipseApplication/commons-collections/NullProperties";
 		if(!createdFolder)
 		{
 			
@@ -197,6 +197,15 @@ public  class AstBuilder {
 		_commentList=new ArrayList<String>();
 		String toBeWritten=compilationUnit.getJavaElement().getElementName();
 		content="package "+packageName+";\n\n";
+		//get import statements
+		List<ImportDeclaration> imports=compilationUnit.imports();
+		if(imports!=null && imports.size()>0)
+		{
+			for(ImportDeclaration imp : imports)
+			{
+				content+="import "+imp.getName()+";\n";
+			}
+		}
 		
 		//parse comments present in every package
 		parseTypes();
@@ -250,30 +259,58 @@ public  class AstBuilder {
 
 		ClassVisitor visitor = new ClassVisitor();
 		_currentCompilationUnit.accept(visitor);
-		
+		String mod="";
 		for (TypeDeclaration classes: visitor.getClasses()) {
 			String className=classes.getName().getIdentifier();
-			String mod=mapModifier(classes.getModifiers());
+			if(classes.modifiers()!=null && classes.modifiers().size()>0)
+			{
+				List<IExtendedModifier> modifiers =classes.modifiers();
+				for(IExtendedModifier modifier : modifiers)
+				{
+					if(modifier.isModifier())
+						mod+=modifier.toString()+" ";
+				}
+			}
+			
 			if(classes.isInterface())
-				content+=mod+" interface "+className+"{\n\n";
+				content+=mod+" interface "+className;
 			else
-				content+=mod+" class "+className+"{\n\n";
+				content+=mod+" class "+className;
+			Type superClass=classes.getSuperclassType();
+			if(superClass!=null && !superClass.toString().isEmpty())
+				content+=" extends "+superClass.toString();
+			List<Type> superInterface=classes.superInterfaceTypes();
+			if(superInterface!=null && superInterface.size()>0 && !superInterface.get(0).toString().isEmpty())
+				content+=" implements "+superInterface.get(0).toString();
+			
+			content+="{\n\n";
 			for(MethodDeclaration method:classes.getMethods())
 			{
 				
 				if(method.getJavadoc()!=null)
 				{
+					String methodMod="";
 					CommentVisitor javadocVisitor=new CommentVisitor(_currentCompilationUnit,_source,_commentList);
 					method.getJavadoc().accept(javadocVisitor);
 					ParseTags(javadocVisitor.getTags(),method);
 					String name=method.getName().getIdentifier();
+					if(method.modifiers()!=null && method.modifiers().size()>0)
+					{
+						List<IExtendedModifier> modifiers =method.modifiers();
+						for(IExtendedModifier modifier : modifiers)
+						{
+							if(modifier.isModifier())
+								methodMod+=modifier.toString()+" ";
+						}
+					}
 					
-					String modifier=mapModifier(method.getModifiers());
+					
+					
 					String returnType="";
 					if(method.getReturnType2()!=null)
 						returnType=method.getReturnType2().toString();
 					List<SingleVariableDeclaration> params=method.parameters();
-					content+=modifier+" "+returnType+" "+name+"(";
+					content+=methodMod+" "+returnType+" "+name+"(";
 					if(params!=null && params.size()>0)
 					{
 						int count=0;
@@ -287,7 +324,7 @@ public  class AstBuilder {
 							
 						}
 					}
-					content+=");\n\n";
+					content+=")\n\n";
 				}
 				
 				
