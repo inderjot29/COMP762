@@ -284,56 +284,70 @@ public  class AstBuilder {
 				content+=" implements "+superInterface.get(0).toString();
 			
 			content+="{\n\n";
-			for(MethodDeclaration method:classes.getMethods())
-			{
-				
-				if(method.getJavadoc()!=null)
-				{
-					String methodMod="";
-					CommentVisitor javadocVisitor=new CommentVisitor(_currentCompilationUnit,_source,_commentList);
-					method.getJavadoc().accept(javadocVisitor);
-					ParseTags(javadocVisitor.getTags(),method);
-					String name=method.getName().getIdentifier();
-					if(method.modifiers()!=null && method.modifiers().size()>0)
-					{
-						List<IExtendedModifier> modifiers =method.modifiers();
-						for(IExtendedModifier modifier : modifiers)
-						{
-							if(modifier.isModifier())
-								methodMod+=modifier.toString()+" ";
-						}
-					}
-					
-					
-					
-					String returnType="";
-					if(method.getReturnType2()!=null)
-						returnType=method.getReturnType2().toString();
-					List<SingleVariableDeclaration> params=method.parameters();
-					content+=methodMod+" "+returnType+" "+name+"(";
-					if(params!=null && params.size()>0)
-					{
-						int count=0;
-						for(SingleVariableDeclaration param:params)
-						{
-							if(count>0)
-								content+=", ";
-							content+=param.getType()+" ";
-							content+=param.getName().toString();
-							count++;
-							
-						}
-					}
-					content+=")\n\n";
-				}
-				
-				
-			}
+			
+			parseMethods(classes.getMethods());
+			
 			content+="}\n\n";
 		}
 			
 	}
 	
+	private static void parseMethods(MethodDeclaration[] methodDeclarations)
+	{
+		for(MethodDeclaration method:methodDeclarations)
+		{
+			
+			if(method.getJavadoc()!=null)
+			{
+				String methodMod="";
+				CommentVisitor javadocVisitor=new CommentVisitor(_currentCompilationUnit,_source,_commentList);
+				method.getJavadoc().accept(javadocVisitor);
+				ParseTags(javadocVisitor.getTags(),method);
+				String name=method.getName().getIdentifier();
+				if(method.modifiers()!=null && method.modifiers().size()>0)
+				{
+					List<IExtendedModifier> modifiers =method.modifiers();
+					for(IExtendedModifier modifier : modifiers)
+					{
+						if(modifier.isModifier())
+							methodMod+=modifier.toString()+" ";
+					}
+				}
+				
+				
+				
+				String returnType="";
+				if(method.getReturnType2()!=null)
+					returnType=method.getReturnType2().toString();
+				content+=methodMod+" "+returnType+" "+name;
+				List<SingleVariableDeclaration> params=method.parameters();
+				parseParameters(params);
+				
+			}
+			
+			
+		}
+	}
+	
+	private static void parseParameters(List<SingleVariableDeclaration> params)
+	{
+		content+="(";
+		if(params!=null && params.size()>0)
+		{
+			int count=0;
+			for(SingleVariableDeclaration param:params)
+			{
+				if(count>0)
+					content+=", ";
+				content+=param.getType()+" ";
+				content+=param.getName().toString();
+				count++;
+				
+			}
+		}
+		content+=")\n\n";
+	}
+	 
 	private static String mapModifier(int mod)
 	{
 		if(Modifier.isDefault(mod))
