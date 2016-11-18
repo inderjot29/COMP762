@@ -396,7 +396,13 @@ public  class AstBuilder {
 			for(Map.Entry<String,String> entry:nullTable.entrySet() )
 			{
 				if(entry.getValue().equals("@YesNull"))
+				{
+					if(exceptionsTable.get(entry.getKey())!=null)
 					content+=entry.getValue()+"("+entry.getKey()+"=="+"null =>"+exceptionsTable.get(entry.getKey())+")\n";
+					else
+						content+=entry.getValue()+"("+entry.getKey()+"=="+"null)\n";
+						
+				}
 				else
 					content+=entry.getValue()+"("+entry.getKey()+")\n";
 			}
