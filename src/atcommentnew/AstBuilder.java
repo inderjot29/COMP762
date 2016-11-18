@@ -43,17 +43,14 @@ public  class AstBuilder {
 	// instance of identifier used to capture all the required properties of a renamed java element.
 	
 	private static CompilationUnit _currentCompilationUnit;
-	private static ICompilationUnit _cunit;
-	private String _currentPackage;
-	private static String _projectName;
-	private int numberOfIdentifiers=0;
 	private static File file;
 	private static String content="";
 	static Hashtable<String,String> nullTable=new  Hashtable<String,String>();
 	static Hashtable<String,String> exceptionsTable=new  Hashtable<String,String>();
 	static boolean createdFolder=false;
 	private static final String _regex="(?<=[a-z])((?=[A-Z])|(?=[0-9])|(?=[/_]))|(?<=[A-Z])((?=[A-Z][a-z])|(?=[/_])|(?=[0-9]))|(?<=[/_])((?=[a-z])|(?=[0-9])|(?=[A-Z]))|(?<=[0-9])((?=[a-z])|(?=[/_])|(?=[A-Z]))|([,])";
-	
+	private static int _paramNull=0;
+	private static int _throwsNull=0;
 	
 	private AstBuilder()
 	{
@@ -91,9 +88,11 @@ public  class AstBuilder {
 		 
 
 		// Get all projects in the workspace
-		IProject project = root.getProject("commons-collections");
+		IProject project = root.getProject("guava");
 		try {
 			getProjectInfo(project);
+			System.out.println("Params Null-"+_paramNull);
+			System.out.println("Throws Null-"+_throwsNull);
 		} catch (CoreException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
@@ -153,7 +152,6 @@ public  class AstBuilder {
 			parser.setSource(unit);
 			parser.setResolveBindings(true);
 			final CompilationUnit cu=(CompilationUnit) parser.createAST(null);
-			
 			return cu;
 		} catch (Exception e) {
 			// TODO Auto-generated catch block
@@ -176,7 +174,7 @@ public  class AstBuilder {
 		IPath withoutExtension=unit.getPath().removeFileExtension();
 		
 		boolean success=false;
-		String path="/home/2015/iratol/runtime-EclipseApplication/commons-collections/NullProperties";
+		String path="D:\\COMP762\\Project\\guava-20.0\\guava-20.0\\NullProperties";
 		if(!createdFolder)
 		{
 			
@@ -245,6 +243,7 @@ public  class AstBuilder {
 			fw = new FileWriter(file.getAbsoluteFile());
 			BufferedWriter bw = new BufferedWriter(fw);
 			bw.write(content);
+			
 			bw.close();
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
@@ -479,6 +478,7 @@ public  class AstBuilder {
 				switch(nextToken)
 				{
 				case "null":
+					_paramNull++;
 					if(negated)
 						annotation="@NonNull";
 					else
@@ -567,9 +567,15 @@ public  class AstBuilder {
 			for(String token:tokens)
 			{
 				if(checkYesNull(token.toLowerCase(),text))
+				{
 					yesNulls++;
-				else if(checkYesNull(token.toLowerCase(),text))
+					_throwsNull++;
+				}
+				else if(checkNonNull(token.toLowerCase(),text))
+				{
 					nonNulls++;
+					_throwsNull++;
+				}
 			}
 			 if(yesNulls==tokens.size())
 			 {
