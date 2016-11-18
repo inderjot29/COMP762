@@ -40,7 +40,10 @@ public  class AstBuilder {
 	private static String _source;
 	// list of comments' text, needed for further processing of comments
 	static List<String> _commentList = new ArrayList<String>();
-	// instance of identifier used to capture all the required properties of a renamed java element.
+	
+	private static int paramsTags=0;
+	private static int throwsTag=0;
+	
 	
 	private static CompilationUnit _currentCompilationUnit;
 	private static ICompilationUnit _cunit;
@@ -71,27 +74,10 @@ public  class AstBuilder {
 		IWorkspace workspace = ResourcesPlugin.getWorkspace();
 		IWorkspaceRoot root = workspace.getRoot();
 		
-		/*Runnable runnable = new Runnable() {
-			public void run() {
-				try {
-					IPath projectDotProjectFile = new Path("/"+_projectName + "/.project");
-					IProjectDescription projectDescription = workspace.loadProjectDescription(projectDotProjectFile);
-					IProject project = workspace.getRoot().getProject(projectDescription.getName());
-					JavaCapabilityConfigurationPage.createProject(project, projectDescription.getLocationURI(),	null);
-					//project.create(null);
-				} catch (CoreException e) {
-					e.printStackTrace();
-				}
-			}
-		};
-		 
-		// and now get the workbench to do the work
-		//final IWorkbench workbench = PlatformUI.getWorkbench();
-		//workbench.getDisplay().syncExec(runnable);*/
-		 
+		
 
 		// Get all projects in the workspace
-		IProject project = root.getProject("commons-collections");
+		IProject project = root.getProject("joda-time");
 		try {
 			getProjectInfo(project);
 		} catch (CoreException e) {
@@ -176,7 +162,8 @@ public  class AstBuilder {
 		IPath withoutExtension=unit.getPath().removeFileExtension();
 		
 		boolean success=false;
-		String path="/home/2015/iratol/runtime-EclipseApplication/commons-collections/NullProperties";
+		//String path="/home/2015/iratol/git/atComment/programs/jetuml/NullProperties";
+		String path="/home/2015/iratol/runtime-EclipseApplication/joda-time/NullProperties";
 		if(!createdFolder)
 		{
 			
@@ -206,7 +193,7 @@ public  class AstBuilder {
 				content+="import "+imp.getName()+";\n";
 			}
 		}
-		
+		content+="\n";
 		//parse comments present in every package
 		parseTypes();
 		
@@ -246,6 +233,8 @@ public  class AstBuilder {
 			BufferedWriter bw = new BufferedWriter(fw);
 			bw.write(content);
 			bw.close();
+			System.out.println("\n Param tags:"+paramsTags);
+			System.out.println("Throws tags:"+throwsTag);
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
@@ -374,10 +363,12 @@ public  class AstBuilder {
 			{
 					if(tag.getTagName().equalsIgnoreCase("@param"))
 					{
+						paramsTags++;
 						splitTagandProcess(tag,TagElement.TAG_PARAM);
 					}
 					else if(tag.getTagName().equalsIgnoreCase("@throws"))
 					{
+						throwsTag++;
 						splitTagandProcess(tag,TagElement.TAG_THROWS);
 					}
 			}
