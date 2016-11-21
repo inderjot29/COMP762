@@ -45,41 +45,39 @@ public  class AstBuilder {
 	// list of comments' text, needed for further processing of comments
 	static List<String> _commentList = new ArrayList<String>();
 	
-	private static int paramsTags=0;
-	private static int throwsTag=0;
+	//list containing params of the method under parsing
 	private static List<SingleVariableDeclaration> params=null;
 	
 	private static CompilationUnit _currentCompilationUnit;
+	//file to write the content of inferred properties
 	private static File file;
+	//string to contain the content to be written in the file
 	private static String content="";
+	
 	static Hashtable<String,String> nullTable=new  Hashtable<String,String>();
 	static Hashtable<String,String> exceptionsTable=new  Hashtable<String,String>();
 	static boolean createdFolder=false;
+	// to split the identifiers based on camel casing
 	private static final String _regex="(?<=[a-z])((?=[A-Z])|(?=[0-9])|(?=[/_]))|(?<=[A-Z])((?=[A-Z][a-z])|(?=[/_])|(?=[0-9]))|(?<=[/_])((?=[a-z])|(?=[0-9])|(?=[A-Z]))|(?<=[0-9])((?=[a-z])|(?=[/_])|(?=[A-Z]))|([,])";
+	
+	//counters to keep the count of inferred properties
 	private static int _paramNull=0;
 	private static int _throwsNull=0;
 	private static int knownParamNull=0;
 	private static int _throwsNullPerFile=0;
 	private static String _projectName;
+	private static int _paramNullPerFile=0;
+	private static int _unknownNullPerFile=0;
+	private static int _nonNullPerFile=0;
+	private static int _yesNullPerFile=0;
 	
-	private AstBuilder()
-	{
-		
-		
-	}
+	private AstBuilder(){}
 	
-	
-	
-	
-
 	/** 
 	 * Getting workspace and deleting all the existing markers if any.*/
 	public static void initASTParsing(){
 		IWorkspace workspace = ResourcesPlugin.getWorkspace();
 		IWorkspaceRoot root = workspace.getRoot();
-		
-		
-
 		// Get all projects in the workspace
 		IProject[] projects = root.getProjects();
 		for(IProject project :projects)
@@ -87,11 +85,11 @@ public  class AstBuilder {
 		try {
 			_projectName=project.getName();
 			createdFolder=false;
-			if(_projectName.equals("junit"))
+			//if(_projectName.equals("pmd-core"))
 			{
 			getProjectInfo(project);
+			
 			System.out.println("Known Param Null in "+_projectName+" "+knownParamNull);
-			_paramNull+=knownParamNull;
 			System.out.println("TotalParams Null in "+_projectName+" "+_paramNull);
 			System.out.println("Throws Null in "+_projectName+" "+_throwsNull);
 			knownParamNull=0;
@@ -172,11 +170,8 @@ public  class AstBuilder {
 		
 	}
 
-
-	
-
 	/**
-	 * Reads a ICompilationUnit and creates the AST DOM for manipulating the
+	 * Reads a ICompilationUnit and creates the AST DOM for parsing 
 	 * @param packageName
 	 * @throws JavaModelException
 	 */
@@ -191,14 +186,16 @@ public  class AstBuilder {
 		
 		_source=unit.getSource();
 		_commentList=new ArrayList<String>();
+		//writing import statements in the file
 		writeImportsIntoContentString(compilationUnit);
-		String toBeWritten=compilationUnit.getJavaElement().getElementName();
+		//writing package declaration in the file
 		content="package "+packageName+";\n\n";
 		
 		//start with the top level declaration and traverse the AST tree to get type declarations and methods
 		parseTypes();
 		
-		//if(exceptionsTable.size()>0 || nullTable.size()>0)
+		//check if the file contains yes nulls or non nulls as unknown nulls are not of much use. Only needed to get accuracy set 
+		//if((_yesNullPerFile+_nonNullPerFile)>0)
 		{
 				createInferFileForUnit(unit);
 				//write the file  content to file 	
@@ -207,6 +204,10 @@ public  class AstBuilder {
 	}
 	
 	
+	/**
+	 * Creates a file with extension .infer for every class file parsed
+	 * @param unit
+	 */
 	private static void createInferFileForUnit(ICompilationUnit unit)
 	{
 		IPath withoutExtension=unit.getPath().removeFileExtension();
@@ -214,9 +215,9 @@ public  class AstBuilder {
 		boolean success=false;
 
 		//String path="/home/2015/iratol/git/atComment/programs/jetuml/NullProperties";
-		String path="/home/2015/iratol/git/atComment/programs/"+_projectName+"/NullProperties";
+		//String path="/home/2015/iratol/git/atComment/programs/"+_projectName+"/NullProperties";
 		
-		//String path="D:\\COMP762\\Project\\guava-20.0\\guava-20.0\\NullProperties";
+		String path="C:\\cygwin64\\home\\inder\\programs\\pmd\\NullProperties";
 
 		if(!createdFolder)
 		{
@@ -224,8 +225,7 @@ public  class AstBuilder {
 			success=new File(path).mkdir();
 			createdFolder=true;
 		}
-		
-			createFile(path+"/"+withoutExtension.lastSegment()+".infer");
+		createFile(path+"/"+withoutExtension.lastSegment()+".infer");
 		
 	}
 	
@@ -268,10 +268,13 @@ public  class AstBuilder {
 			BufferedWriter bw = new BufferedWriter(fw);
 			knownParamNull+=nullTable.size();
 			
-			String nullValues="/** Number of param nulls in the file :"+nullTable.size()+"\n * number of throw tags with  null in file :"+_throwsNullPerFile+"\n */\n\n";
+			String nullValues="/** Number of Unknown nulls in the file :"+_unknownNullPerFile+"\n * Number of Yes nulls in the file :"+_yesNullPerFile+"\n * Number of Non nulls in the file :"+_nonNullPerFile+"\n * number of throws null in file :"+_throwsNullPerFile+"\n */\n\n";
 			content=nullValues+content;
 			bw.write(content);
 			_throwsNullPerFile=0;
+			_unknownNullPerFile=0;
+			_nonNullPerFile=0;
+			_yesNullPerFile=0;
 			bw.close();
 			//System.out.println("\n Param tags:"+paramsTags);
 			//System.out.println("Throws tags:"+throwsTag);
@@ -289,8 +292,11 @@ public  class AstBuilder {
 		ClassVisitor visitor = new ClassVisitor();
 		_currentCompilationUnit.accept(visitor);
 		String mod="";
+		
+		//loop through every type present in the source code and look for null properties
 		for (TypeDeclaration classes: visitor.getClasses()) {
 			String className=classes.getName().getIdentifier();
+			// getting modifiers for the current class to write the specific signature in the file
 			if(classes.modifiers()!=null && classes.modifiers().size()>0)
 			{
 				List<IExtendedModifier> modifiers =classes.modifiers();
@@ -301,18 +307,14 @@ public  class AstBuilder {
 				}
 			}
 			
-			if(classes.isInterface())
-				content+=mod+" interface "+className;
-			else
+			//check if the type is an interface or class, and accordingly use the appropriate word- extends/implements
+			if(!classes.isInterface())
 				content+=mod+" class "+className;
-			Type superClass=classes.getSuperclassType();
-			if(superClass!=null && !superClass.toString().isEmpty())
-				content+=" extends "+superClass.toString();
-			List<Type> superInterface=classes.superInterfaceTypes();
-			if(superInterface!=null && superInterface.size()>0 && !superInterface.get(0).toString().isEmpty())
-				content+=" implements "+superInterface.get(0).toString();
+			else
+				content+=mod+" interface "+className;
 			
-			content+="{\n\n";
+			//getting the name of super class or super interface	
+			writeSuperClassInfo(classes);
 			
 			// traverse methods present in the type 
 			parseMethods(classes.getMethods());
@@ -323,6 +325,19 @@ public  class AstBuilder {
 			
 	}
 	
+	private static void writeSuperClassInfo(TypeDeclaration classes)
+	{
+		Type superClass=classes.getSuperclassType();
+		if(superClass!=null && !superClass.toString().isEmpty())
+			content+=" extends "+superClass.toString();
+		List<Type> superInterface=classes.superInterfaceTypes();
+		if(superInterface!=null && superInterface.size()>0 && !superInterface.get(0).toString().isEmpty())
+			content+=" implements "+superInterface.get(0).toString();
+		
+		content+="{\n\n";
+	}
+	
+	//parses methods present in a type declaration AST node
 	private static void parseMethods(MethodDeclaration[] methodDeclarations)
 	{
 		for(MethodDeclaration method:methodDeclarations)
@@ -351,6 +366,7 @@ public  class AstBuilder {
 				if(method.getReturnType2()!=null)
 					returnType=method.getReturnType2().toString();
 				content+=methodMod+" "+returnType+" "+name;
+				//getting formal parameters and parsing the parameter nodes
 				List<SingleVariableDeclaration> params=method.parameters();
 				parseParameters(params);
 				
@@ -360,6 +376,10 @@ public  class AstBuilder {
 		}
 	}
 	
+	/**
+	 * Parses the parameters of a method to write the complete signature of a method in file
+	 * @param params list of formal parameters
+	 */
 	private static void parseParameters(List<SingleVariableDeclaration> params)
 	{
 		content+="(";
@@ -382,6 +402,11 @@ public  class AstBuilder {
 	
 	
 	
+	/**
+	 * @param tags javadoc tags
+	 * @param method method related to the javadoc tags
+	 */
+	@SuppressWarnings("unchecked")
 	private static void ParseTags(List<TagElement> tags,MethodDeclaration method)
 	{
 		nullTable=new  Hashtable<String,String>();
@@ -394,12 +419,10 @@ public  class AstBuilder {
 			{
 					if(tag.getTagName().equalsIgnoreCase("@param"))
 					{
-						paramsTags++;
 						splitTagandProcess(tag,TagElement.TAG_PARAM);
 					}
 					else if(tag.getTagName().equalsIgnoreCase("@throws"))
 					{
-						throwsTag++;
 						splitTagandProcess(tag,TagElement.TAG_THROWS);
 					}
 			}
@@ -450,7 +473,7 @@ public  class AstBuilder {
 	private static String processParamTag(String text)
 	{
 		String annotation="";
-		StringTokenizer multiTokenizer = new StringTokenizer(text, ",://.- ");
+		StringTokenizer multiTokenizer = new StringTokenizer(text, ",://.-<>(){}[] ");
 		boolean negated=false;
 		while (multiTokenizer.hasMoreTokens())
 		{
@@ -480,16 +503,22 @@ public  class AstBuilder {
 					else
 						negated=true;
 					break;
+				case "non":
+					if(!annotation.equals(""))
+						return "@NonNull";
+					else
+						negated=true;
+					break;
 				}
 			}
 			
 		}
-		/*if(annotation.equals(""))
+		if(annotation.equals(""))
 		{
 		
 				return "@UnknownNull";
 				
-		}*/
+		}
 		
 		return annotation;
 		
@@ -557,32 +586,39 @@ public  class AstBuilder {
 				if(checkYesNull(token.toLowerCase(),text))
 				{
 					yesNulls++;
-					
-					
 				}
 				else if(checkNonNull(token.toLowerCase(),text))
 				{
 					nonNulls++;
-					
-					
 				}
 			}
-			 if(yesNulls==tokens.size())
-			 {
-				
-				
-				 exceptionsTable.put(entry, exceptionName);
-					nullTable.replace(entry,"@YesNull");
-					return true;
-			 }
-			 else if(nonNulls==tokens.size())
-			 {
-				
-				
-				 exceptionsTable.put(entry, exceptionName);
-					nullTable.replace(entry,"@NonNull");
-					return true;
-			 }
+			
+			if(tokens.size()==1)
+			{
+				 if(yesNulls==tokens.size()) {
+					 exceptionsTable.put(entry, exceptionName);
+						nullTable.replace(entry,"@YesNull");
+						return true;
+				 }
+				 else if(nonNulls==tokens.size()){
+					 exceptionsTable.put(entry, exceptionName);
+						nullTable.replace(entry,"@NonNull");
+						return true;
+				 }
+			}
+			else if(tokens.size()>1)
+			{
+				if(yesNulls>=tokens.size()-1){
+					 exceptionsTable.put(entry, exceptionName);
+						nullTable.replace(entry,"@YesNull");
+						return true;
+				 }
+				 else if(nonNulls>=tokens.size()-1){
+					 exceptionsTable.put(entry, exceptionName);
+						nullTable.replace(entry,"@NonNull");
+						return true;
+				 }
+			}
 		}
 		return false;
 	}
@@ -620,7 +656,7 @@ public  class AstBuilder {
 		return (text.contains(param) && 
 				text.contains("null") 
 				&& (text.contains("not")
-				||text.contains("never")));
+				||text.contains("never")||text.contains("non")));
 	}
 	
 	private static boolean checkYesNull(String param,String text)
@@ -628,7 +664,7 @@ public  class AstBuilder {
 		return (text.contains(param) && 
 				text.contains("null") 
 				&& !text.contains("not")
-				&&!text.contains("never"));
+				&&!text.contains("never")&&!text.contains("non"));
 	}
 	
 	
@@ -647,6 +683,44 @@ public  class AstBuilder {
 
 	private static void annotateMethodsWithNullProperties()
 	{
+		writeOtherExceptionAnnotation();
+		
+		if(nullTable!=null && nullTable.size()>0)
+		{
+			for(Map.Entry<String,String> entry:nullTable.entrySet() )
+			{
+				_paramNull++;
+				_paramNullPerFile++;
+				// if else used to count the final number of different tags 
+				if(entry.getValue().equals("@YesNull"))
+				{
+					_yesNullPerFile++;
+					writeYesNullParam(entry);
+				}
+				else if(entry.getValue().equals("@NonNull"))
+				{
+					_nonNullPerFile++;
+					writeNonNullParam(entry);
+				}
+				else
+				{
+					_unknownNullPerFile++;
+					writeNonNullParam(entry);
+				}
+			}
+			
+		}
+		else if(params!=null && params.size()>0)
+		{
+			//if not in nullTable, means param tag was not present in the comment, tag all params unknownNuLL in that case
+			tagNonJavadocParams();
+			
+		}
+		
+	}
+	
+	private static void writeOtherExceptionAnnotation()
+	{
 		if(exceptionsTable!=null && exceptionsTable.size()>0)
 		{
 			for(Map.Entry<String,String> entry:exceptionsTable.entrySet() )
@@ -659,48 +733,50 @@ public  class AstBuilder {
 			}
 		}
 		
-		if(nullTable!=null && nullTable.size()>0)
+	}
+	
+	private static void writeYesNullParam(Map.Entry<String,String> entry)
+	{
+		if(exceptionsTable.get(entry.getKey())!=null)
 		{
-			for(Map.Entry<String,String> entry:nullTable.entrySet() )
-			{
-				
-				if(entry.getValue().equals("@YesNull"))
-				{
-					
-					if(exceptionsTable.get(entry.getKey())!=null)
-					{
-					content+=entry.getValue()+"("+entry.getKey()+"=="+"null =>"+exceptionsTable.get(entry.getKey())+")\n";
-					_throwsNullPerFile++;
-					_throwsNull++;
-					}
-					else
-					{
-						content+=entry.getValue()+"("+entry.getKey()+"=="+"null)\n";
-						
-					}
-						
-				}
-				else
-					content+=entry.getValue()+"("+entry.getKey()+")\n";
-			}
+		content+=entry.getValue()+"("+entry.getKey()+"==null =>"+exceptionsTable.get(entry.getKey())+")\n";
+		_throwsNullPerFile++;
+		_throwsNull++;
+		}
+		else
+		{
+			content+=entry.getValue()+"("+entry.getKey()+"=="+"null)\n";
 			
 		}
-		else if(params!=null && params.size()>0)
+	}
+	
+	private static void writeNonNullParam(Map.Entry<String,String> entry)
+	{
+		if(exceptionsTable.get(entry.getKey())!=null)
 		{
-			_paramNull++;
-			content+="@UnknownNull(";
-			int count=0;
-			for(SingleVariableDeclaration param:params)
-			{
-				if(count>0)
-					content+=", ";
-				content+=param.getName().toString();
-				count++;
-				
-			}
-			content+=")\n";
+			content+="@YesNull("+entry.getKey()+"==null =>"+exceptionsTable.get(entry.getKey())+")\n";
+			_throwsNullPerFile++;
+			_throwsNull++;
 		}
-		
+		else
+			content+=entry.getValue()+"("+entry.getKey()+")\n";
+	}
+	
+	private static void tagNonJavadocParams()
+	{
+		_paramNull++;
+		_unknownNullPerFile++;
+		content+="@UnknownNull(";
+		int count=0;
+		for(SingleVariableDeclaration param:params)
+		{
+			if(count>0)
+				content+=", ";
+			content+=param.getName().toString();
+			count++;
+			
+		}
+		content+=")\n";
 	}
 }
 
